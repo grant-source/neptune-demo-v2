@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Neptune Ops Influencer Intelligence Platform - Demo" />
+  <meta name="keywords" content="political intelligence, influencer mapping, campaign targeting, network analysis" />
+  <meta name="author" content="Neptune Ops" />
+  <title>Neptune Ops - Influencer Intelligence (Demo)</title>
+  <!-- External Dependencies -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body, #root { height: 100%; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    }
+    /* Loading Screen */
+    #loading {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .spinner {
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 6px solid rgba(255,255,255,.35);
+      border-top-color: #fff; animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Error banner */
+    #error-banner {
+      position: fixed; right: 12px; bottom: 12px; max-width: 520px;
+      background: #111; color: #fff; padding: 12px 14px; border-radius: 10px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.35); display: none; white-space: pre-wrap; z-index: 10000;
+    }
+    #error-banner strong { color: #ffcc00; }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading"><div class="spinner"></div></div>
+  <!-- React Root -->
+  <div id="root"></div>
+  <div id="error-banner"></div>
+
+  <script>
+    // Robust loader hide + error reporting (works even if TSX fails later)
+    (function(){
+      function hide(){ var el = document.getElementById('loading'); if(el) el.style.display = 'none'; }
+      window.addEventListener('DOMContentLoaded', function(){ setTimeout(hide, 500); });
+      window.addEventListener('load', function(){ setTimeout(hide, 500); });
+      setTimeout(hide, 2000); // ultimate fallback
+      window.addEventListener('error', function(e){
+        var box = document.getElementById('error-banner');
+        if(!box) return;
+        box.style.display = 'block';
+        box.innerHTML = '<strong>Runtime error:</strong>\n' + (e.message || e.error || e.toString());
+      });
+    })();
+  </script>
+
+  <!-- App TSX -->
+  <script type="text/babel" data-presets="react,typescript">
+    const { useMemo, useState } = React;
+
+    // Icons (minimal set)
+    const IconSearch = (props: {className?: string}) => (
+      <svg className={props.className || "w-4 h-4"} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+    );
+    const IconUsers = (props: {className?: string}) => (
+      <svg className={props.className || "w-4 h-4"} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+      </svg>
+    );
+    const IconTarget = (props: {className?: string}) => (
+      <svg className={props.className || "w-4 h-4"} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10"></circle>
+        <circle cx="12" cy="12" r="6"></circle>
+        <circle cx="12" cy="12" r="2"></circle>
+      </svg>
+    );
+
+    // Minimal dataset (safe & complete)
+    type Influence = {
+      type: string; name: string; role: string; influence: string;
+      relationship: string; timeframe: string; source: string;
+    };
+    type Person = {
+      name: string; party: string; position: string; influences: Influence[];
+    };
+
+    const DATA: Record<string, Person> = {
+      "Ted Cruz": {
+        name: "Ted Cruz",
+        party: "Republican",
+        position: "U.S. Senator (TX) & Commerce Committee Chair",
+        influences: [
+          {
+            type: "key_staff",
+            name: "Aaron Reitz",
+            role: "Chief of Staff",
+            influence: "Daily Operations & Strategy",
+            relationship: "Senior Staff",
+            timeframe: "2024–Present",
+            source: "Public staff announcement"
+          },
+          {
+            type: "key_staff",
+            name: "Omri Ceren",
+            role: "Senior Advisor for Policy and Communications",
+            influence: "Policy Strategy & Communications",
+            relationship: "Senior Staff",
+            timeframe: "2025–Present",
+            source: "Public staff announcement"
+          }
+        ]
+      },
+      "Kyrsten Sinema": {
+        name: "Kyrsten Sinema",
+        party: "Independent",
+        position: "U.S. Senator (AZ)",
+        influences: [
+          {
+            type: "key_staff",
+            name: "Chief of Staff (Example)",
+            role: "Chief of Staff",
+            influence: "Operations & Strategy",
+            relationship: "Senior Staff",
+            timeframe: "2023–Present",
+            source: "Public directory"
+          }
+        ]
+      }
+    };
+
+    const PEOPLE = Object.values(DATA);
+
+    function Badge({children}:{children: React.ReactNode}) {
+      return <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">{children}</span>;
+    }
+
+    function PersonCard({person}:{person: Person}) {
+      return (
+        <div className="bg-white rounded-2xl shadow hover:shadow-lg transition p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">{person.name}</h3>
+              <p className="text-slate-600">{person.position}</p>
+              <div className="mt-2"><Badge><IconUsers className="w-3 h-3"/>{person.party}</Badge></div>
+            </div>
+            <div className="text-indigo-500"><IconTarget className="w-6 h-6" /></div>
+          </div>
+          <div className="mt-4">
+            <p className="text-sm font-medium text-slate-700 mb-1">Influences</p>
+            <ul className="space-y-2">
+              {person.influences.map((inf, i) => (
+                <li key={i} className="text-sm text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                  <span className="font-medium">{inf.name}</span> — {inf.role} <span className="text-slate-500">({inf.timeframe})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      );
+    }
+
+    function App(): JSX.Element {
+      const [q, setQ] = useState("");
+      const filtered = useMemo(() => {
+        const t = q.trim().toLowerCase();
+        if (!t) return PEOPLE;
+        return PEOPLE.filter(p => [p.name, p.party, p.position].join(" ").toLowerCase().includes(t));
+      }, [q]);
+
+      return (
+        <div className="min-h-full bg-gradient-to-br from-indigo-400 to-purple-500">
+          <header className="bg-white/80 backdrop-blur sticky top-0 z-10">
+            <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600" />
+              <h1 className="text-lg font-semibold">Neptune Ops — Influencer Intelligence (Demo)</h1>
+              <div className="ml-auto relative w-80 max-w-full">
+                <input value={q} onChange={e=>setQ(e.target.value)}
+                  placeholder="Search people or roles..." className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <IconSearch className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-6xl mx-auto px-4 py-8">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map(p => <PersonCard key={p.name} person={p} />)}
+            </div>
+            {filtered.length === 0 && (
+              <p className="text-white/90 text-center mt-12">No results. Try a different search.</p>
+            )}
+          </main>
+
+          <footer className="text-white/80 text-sm text-center py-6">Demo only — replace dataset with your own.</footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+    root.render(<App />);
+  </script>
+</body>
+</html>
